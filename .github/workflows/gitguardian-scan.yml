@@ -27,7 +27,7 @@ jobs:
 
       - name: Fetch User Repositories
         run: |
-          USERNAME="your-github-username"
+          USERNAME="vaishnavucv"
           repos=$(curl -s https://api.github.com/users/$USERNAME/repos | jq -r '.[].clone_url')
           echo "$repos" > repos.txt
           
