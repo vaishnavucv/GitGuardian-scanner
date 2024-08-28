@@ -1,66 +1,62 @@
-name: GitGuardian Scanner
+name: Scan GitHub Repositories for Secrets
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
 
 jobs:
   scan:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Send start message to Discord
-        run: |
-          curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"**Scan Started**: The GitHub profile scan process has started.\"}" https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
+    - name: Send start message to Discord
+      run: |
+        curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"**Scan Started**: The GitHub repository scan process has started.\"}" ${{ secrets.DISCORD_WEBHOOK }}
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq curl
+    - name: Install GitGuardian CLI
+      run: |
+        pip install ggshield
 
-      - name: Read GitHub usernames and get repositories
-        run: |
-          sort github_username.txt | uniq > sorted_usernames.txt
-          while read username; do
-            repos=$(curl -s https://api.github.com/users/$username/repos | jq -r '.[].clone_url')
-            if [ -n "$repos" ]; then
-              echo "$repos" > ${username}_repos.txt
+    - name: Sort GitHub usernames and remove duplicates
+      run: |
+        sort github_username.txt | uniq > sorted_usernames.txt
+
+    - name: Retrieve repositories for each username and scan for secrets
+      run: |
+        while read username; do
+          repos=$(curl -s https://api.github.com/users/$username/repos | jq -r '.[].clone_url')
+          if [ -n "$repos" ]; then
+            echo "$repos" > ${username}_repos.txt
+          else
+            echo "No repositories found for $username" >> error.log
+            curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories found for \`github.com/$username\`\"}" ${{ secrets.DISCORD_WEBHOOK }}
+          fi
+          sleep 1  # Add delay to prevent rate limiting
+        done < sorted_usernames.txt
+
+    - name: Clone repositories and run GitGuardian scan
+      run: |
+        while read username; do
+          mkdir -p repos/$username
+          cd repos/$username
+          if [ -f ../../${username}_repos.txt ]; then
+            while read repo; do
+              git clone $repo || { echo "Failed to clone $repo" >> error.log; continue; }
+            done < ../../${username}_repos.txt
+            ggshield secret scan .
+            scan_status=$?
+            cd ../../
+            if [ $scan_status -eq 0 ]; then
+              curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed Successfully**\n> \`github.com/$username\` Scan Passed and Action Succeeded\"}" ${{ secrets.DISCORD_WEBHOOK }}
             else
-              echo "No repositories found for $username" >> error.log
-              curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories found for ```github.com/$username```\"}" https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
+              curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed with Issues**\n> \`github.com/$username\` Scan Failed and Action Failed\"}" ${{ secrets.DISCORD_WEBHOOK }}
             fi
-            sleep 1  # Add delay to prevent rate limiting
-          done < sorted_usernames.txt
-
-      - name: Clone repositories and scan for secrets
-        run: |
-          while read username; do
-            mkdir -p repos/$username
-            cd repos/$username
-            if [ -f ../../${username}_repos.txt ]; then
-              while read repo; do
-                git clone $repo || { echo "Failed to clone $repo" >> ../../error.log; continue; }
-              done < ../../${username}_repos.txt
-              ggshield secret scan .
-              scan_status=$?
-              cd ../../
-              if [ $scan_status -eq 0 ]; then
-                curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed Successfully**\n> ```github.com/$username Scan Passed and Action Succeeded```\"}" https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
-              else
-                curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed with Issues**\n> ```github.com/$username Scan Failed and Action Failed```\"}" https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
-              fi
-            else
-              curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories to scan for ```github.com/$username```\"}" https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
-            fi
-            sleep 1  # Add delay to prevent rate limiting
-          done < sorted_usernames.txt
-
-      - name: Cleanup
-        run: |
-          rm -rf repos
-          rm sorted_usernames.txt
-          rm *_repos.txt
+          else
+            curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories to scan for \`github.com/$username\`\"}" ${{ secrets.DISCORD_WEBHOOK }}
+          fi
+          sleep 1  # Add delay to prevent rate limiting
+        done < sorted_usernames.txt
