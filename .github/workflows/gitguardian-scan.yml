@@ -15,14 +15,10 @@ jobs:
 
     - name: Send start message to Discord
       run: |
-        if [ -z "${{ secrets.DISCORD_WEBHOOK }}" ]; then
-          echo "Discord webhook URL not set. Please set the DISCORD_WEBHOOK secret in your repository settings."
-          exit 1
-        fi
         curl -H "Content-Type: application/json" \
              -X POST \
              -d "{\"content\": \"**Scan Started**: The GitHub profile scan process has started.\"}" \
-             ${{ secrets.DISCORD_WEBHOOK }}
+             https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
 
     - name: Install GitGuardian CLI
       run: |
@@ -39,7 +35,7 @@ jobs:
             curl -H "Content-Type: application/json" \
                  -X POST \
                  -d "{\"content\": \"> **Error**: No repositories found for ```github.com/$username```\"}" \
-                 ${{ secrets.DISCORD_WEBHOOK }}
+                 https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
           fi
           sleep 1  # Add delay to prevent rate limiting
         done < github_username.txt
@@ -60,18 +56,18 @@ jobs:
               curl -H "Content-Type: application/json" \
                    -X POST \
                    -d "{\"content\": \"> **Scan Completed Successfully**\n> ```github.com/$username Scan Passed and Action Succeeded```\"}" \
-                   ${{ secrets.DISCORD_WEBHOOK }}
+                   https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
             else
               curl -H "Content-Type: application/json" \
                    -X POST \
                    -d "{\"content\": \"> **Scan Completed with Issues**\n> ```github.com/$username Scan Failed and Action Failed```\"}" \
-                   ${{ secrets.DISCORD_WEBHOOK }}
+                   https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
             fi
           else
             curl -H "Content-Type: application/json" \
                  -X POST \
                  -d "{\"content\": \"> **Error**: No repositories to scan for ```github.com/$username```\"}" \
-                 ${{ secrets.DISCORD_WEBHOOK }}
+                 https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
           fi
           sleep 1  # Add delay to prevent rate limiting
         done < github_username.txt
