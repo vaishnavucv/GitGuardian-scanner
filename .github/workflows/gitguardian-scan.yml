@@ -1,0 +1,51 @@
+name: GitGuardian Profile Scan
+
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  scanning:
+    name: Scan GitHub Profile for Secrets
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # fetch all history so multiple commits can be scanned
+
+      - name: Install Required Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      - name: Fetch User Repositories
+        run: |
+          USERNAME="your-github-username"
+          repos=$(curl -s https://api.github.com/users/$USERNAME/repos | jq -r '.[].clone_url')
+          echo "$repos" > repos.txt
+          
+      - name: Clone Repositories
+        run: |
+          mkdir repos
+          cd repos
+          while read repo; do
+            git clone $repo
+          done < ../repos.txt
+
+      - name: GitGuardian Scan
+        uses: GitGuardian/ggshield/actions/secret@v1.30.1
+        env:
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+        with:
+          path: repos
+
+      - name: Cleanup
+        run: |
+          rm -rf repos repos.txt
