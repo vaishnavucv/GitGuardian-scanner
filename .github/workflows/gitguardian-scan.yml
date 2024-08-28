@@ -11,10 +11,14 @@ on:
 
 jobs:
   scanning:
-    name: Scan GitHub Profile for Secrets
+    name: Scan GitHub Profiles for Secrets
     runs-on: ubuntu-latest
     
     steps:
+      - name: Send Start Message to Discord
+        run: |
+          curl -H "Content-Type: application/json" -d '{"content": "**Scan Started**\n*The scan for secrets has begun.*"}' ${{ secrets.DISCORD_WEBHOOK_URL }}
+
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
@@ -27,9 +31,10 @@ jobs:
 
       - name: Fetch User Repositories
         run: |
-          USERNAME="vaishnavucv"
-          repos=$(curl -s https://api.github.com/users/$USERNAME/repos | jq -r '.[].clone_url')
-          echo "$repos" > repos.txt
+          while read USERNAME; do
+            repos=$(curl -s https://api.github.com/users/$USERNAME/repos | jq -r '.[].clone_url')
+            echo "$repos" >> repos.txt
+          done < company_list.txt
           
       - name: Clone Repositories
         run: |
@@ -45,7 +50,25 @@ jobs:
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
         with:
           path: repos
+        continue-on-error: true
+
+      - name: Send Scan Completion Message to Discord
+        if: ${{ always() }}
+        run: |
+          STATUS="Success"
+          if [ ${{ steps.GitGuardian Scan.outcome }} != "success" ]; then
+            STATUS="Failed"
+          fi
+          while read USERNAME; do
+            curl -H "Content-Type: application/json" -d '{
+              "content": "**Scan Completed**\n> github.com/'${USERNAME}'\n> ```Scan Status: '$STATUS'```"
+            }' ${{ secrets.DISCORD_WEBHOOK_URL }}
+          done < company_list.txt
 
       - name: Cleanup
         run: |
           rm -rf repos repos.txt
+          
+      - name: Send Cleanup Message to Discord
+        run: |
+          curl -H "Content-Type: application/json" -d '{"content": "**Cleanup Completed**\n*All temporary files and directories have been removed.*"}' ${{ secrets.DISCORD_WEBHOOK_URL }}
