@@ -31,6 +31,7 @@ jobs:
 
       - name: Fetch Repositories from List
         run: |
+          sort github_profiles.txt | uniq > sorted_profiles.txt
           while read url; do
             username=$(echo $url | awk -F/ '{print $4}')
             repos=$(curl -s https://api.github.com/users/$username/repos | jq -r '.[].clone_url')
@@ -40,7 +41,8 @@ jobs:
               echo "No repositories found for $username" >> error.log
               curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories found for ```github.com/$username```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
             fi
-          done < github_profiles.txt
+            sleep 1  # Add delay to prevent rate limiting
+          done < sorted_profiles.txt
 
       - name: Clone Repositories and Scan
         run: |
@@ -63,9 +65,11 @@ jobs:
             else
               curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories to scan for ```github.com/$username```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
             fi
-          done < github_profiles.txt
+            sleep 1  # Add delay to prevent rate limiting
+          done < sorted_profiles.txt
 
       - name: Cleanup
         run: |
           rm -rf repos *.txt
           curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"**Cleanup Completed**: The temporary files and directories have been removed.\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+          sleep 1  # Add delay to prevent rate limiting
