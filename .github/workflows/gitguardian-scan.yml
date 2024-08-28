@@ -15,14 +15,12 @@ jobs:
 
     - name: Send start message to Discord
       run: |
-        if [ -z "${{ secrets.DISCORD_WEBHOOK }}" ]; then
-          echo "Discord webhook URL not set. Please set the DISCORD_WEBHOOK secret in your repository settings."
-          exit 1
-        fi
         curl -H "Content-Type: application/json" \
              -X POST \
              -d "{\"content\": \"**Scan Started**: The GitHub profile scan process has started.\"}" \
              ${{ secrets.DISCORD_WEBHOOK }}
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
     - name: Install GitGuardian CLI
       run: |
