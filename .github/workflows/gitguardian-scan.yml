@@ -3,7 +3,7 @@ name: GitHub Profile Scanner
 on:
   push:
     branches:
-      - main  # Adjust this to your branch
+      - main
 
 jobs:
   scan:
@@ -49,7 +49,7 @@ jobs:
             while read repo; do
               git clone $repo || { echo "Failed to clone $repo" >> ../../error.log; continue; }
             done < ../../${username}_repos.txt
-            ggshield secret scan .
+            ggshield secret scan repo .
             scan_status=$?
             cd ../../
             if [ $scan_status -eq 0 ]; then
