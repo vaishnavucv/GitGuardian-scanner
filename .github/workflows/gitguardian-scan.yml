@@ -34,7 +34,12 @@ jobs:
           while read url; do
             username=$(echo $url | awk -F/ '{print $4}')
             repos=$(curl -s https://api.github.com/users/$username/repos | jq -r '.[].clone_url')
-            echo "$repos" > ${username}_repos.txt
+            if [ -n "$repos" ]; then
+              echo "$repos" > ${username}_repos.txt
+            else
+              echo "No repositories found for $username" >> error.log
+              curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories found for ```github.com/$username```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+            fi
           done < github_profiles.txt
 
       - name: Clone Repositories and Scan
@@ -43,16 +48,20 @@ jobs:
             username=$(echo $url | awk -F/ '{print $4}')
             mkdir -p repos/$username
             cd repos/$username
-            while read repo; do
-              git clone $repo
-            done < ../../${username}_repos.txt
-            ggshield secret scan .
-            scan_status=$?
-            cd ../../
-            if [ $scan_status -eq 0 ]; then
-              curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed Successfully**\n> ```github.com/$username Scan Passed and Action Succeeded```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+            if [ -f ../../${username}_repos.txt ]; then
+              while read repo; do
+                git clone $repo || { echo "Failed to clone $repo" >> error.log; continue; }
+              done < ../../${username}_repos.txt
+              ggshield secret scan .
+              scan_status=$?
+              cd ../../
+              if [ $scan_status -eq 0 ]; then
+                curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed Successfully**\n> ```github.com/$username Scan Passed and Action Succeeded```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+              else
+                curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed with Issues**\n> ```github.com/$username Scan Failed and Action Failed```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+              fi
             else
-              curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed with Issues**\n> ```github.com/$username Scan Failed and Action Failed```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+              curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories to scan for ```github.com/$username```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
             fi
           done < github_profiles.txt
 
