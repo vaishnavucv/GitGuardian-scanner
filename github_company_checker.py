@@ -17,9 +17,9 @@ colorama.init(autoreset=True)
 # ASCII Art Banner
 BANNER = r"""
   ____ _ _   _ _     _     _   _ ____  _____  __     _______    _____ ____  
- / ___(_) |_| (_) __| | __| | | | |  \/  \ \ / /_   _| ____|  |  ___| __ ) 
+ / ___(_) |_| (_) __| | __| | |  \/  \ \ / /_   _| ____|  |  ___| __ ) 
 | |  _| | __| | |/ _` |/ _` | | | | |\/| |\ V /| | | |  _|    | |_  |  _ \ 
-| |_| | | |_| | | (_| | (_| | |_| | |  | | | | | |_| | |___   |  _| | |_) |
+| |_| | | |_| | | (_| | (_| | |_| | |  | | | | |_| | |___   |  _| | |_) |
  \____|_|\__|_|_|\__,_|\__,_|\___/|_|  |_| |_|  \__,_|_____|  |_|   |____/ 
                                                                           
 """
@@ -33,6 +33,9 @@ SHODAN_API_KEYS = [os.getenv('SHODAN_API_KEY_1'), os.getenv('SHODAN_API_KEY_2')]
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Initialize a set to store unique usernames
+usernames_set = set()
+
 # Function to search for GitHub profiles
 def search_github(company_name):
     try:
@@ -41,7 +44,7 @@ def search_github(company_name):
         logging.debug(f'Searching GitHub for {company_name} with URL: {search_url}')
         
         response = requests.get(search_url)
-        return search_url, response.status_code
+        return regex, response.status_code
     except Exception as e:
         logging.error(f"Error searching GitHub for {company_name}: {e}")
         return None, None
@@ -54,7 +57,7 @@ def search_shodan(company_name):
         results = shodan_api.search(company_name)
         for result in results['matches']:
             if 'github.com' in result.get('http', {}).get('host', ''):
-                return result['http']['host']
+                return result['http']['host'].split('/')[-1]
         return None
     except Exception as e:
         logging.error(f"Error searching Shodan for {company_name}: {e}")
@@ -62,21 +65,19 @@ def search_shodan(company_name):
 
 # Function to process each company name
 def process_company(company_name, table):
-    github_url, github_status = search_github(company_name)
+    github_username, github_status = search_github(company_name)
     shodan_result = search_shodan(company_name)
 
-    if github_status == 200:
-        print(Fore.GREEN + f"Found GitHub profile for {company_name}: {github_url}")
-        with open('github_profiles.txt', 'a') as f:
-            f.write(github_url + '\n')
-        table.add_row([company_name, github_url, "Found via GitHub"])
-    elif shodan_result:
-        print(Fore.CYAN + f"Shodan found a GitHub link for {company_name}: {shodan_result}")
-        with open('github_profiles.txt', 'a') as f:
-            f.write(f"https://{shodan_result}" + '\n')
-        table.add_row([company_name, f"https://{shodan_result}", "Found via Shodan"])
+    if github_status == 200 and github_username not in usernames_set:
+        print(Fore.GREEN + f"Found GitHub username for {company_name}: {github_username}")
+        usernames_set.add(github_username)
+        table.add_row([company_name, github_username, "Found via GitHub"])
+    elif shodan_result and shodan_result not in usernames_set:
+        print(Fore.CYAN + f"Shodan found a GitHub username for {company_name}: {shodan_result}")
+        usernames_set.add(shodan_result)
+        table.add_row([company_name, shodan_result, "Found via Shodan"])
     else:
-        print(Fore.YELLOW + f"No GitHub profile found for {company_name}")
+        print(Fore.YELLOW + f"No GitHub username found for {company_name}")
         table.add_row([company_name, "N/A", "Not Found"])
 
 # Main function
@@ -101,9 +102,9 @@ def main():
         print(Fore.RED + f"File '{args.file}' not found.")
         sys.exit(1)
 
-    table = PrettyTable(["Company Name", "GitHub Profile", "Status"])
+    table = PrettyTable(["Company Name", "GitHub Username", "Status"])
     table.align["Company Name"] = "l"
-    table.align["GitHub Profile"] = "l"
+    table.align["GitHub Username"] = "l"
     table.align["Status"] = "l"
 
     # Process each company name in a separate thread
@@ -116,6 +117,11 @@ def main():
     # Wait for all threads to finish
     for t in threads:
         t.join()
+
+    # Save the unique usernames to a file
+    with open('github_username.txt', 'w') as f:
+        for username in sorted(usernames_set):
+            f.write(username + '\n')
 
     print(table)
     print(Fore.GREEN + "All companies processed.")
