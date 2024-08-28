@@ -56,7 +56,7 @@ jobs:
               curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed with Issues**\n> \`github.com/$username\` Scan Failed and Action Failed\"}" ${{ secrets.DISCORD_WEBHOOK }}
             fi
           else
-            curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories to scan for \`github.com/$username\`\"}" ${{ secrets.DISCORD_WEBHOOK }}
+            curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Error**: No repositories to scan..! for \`github.com/$username\`\"}" ${{ secrets.DISCORD_WEBHOOK }}
           fi
           sleep 1  # Add delay to prevent rate limiting
         done < sorted_usernames.txt
