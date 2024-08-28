@@ -35,7 +35,7 @@ jobs:
             username=$(echo $url | awk -F/ '{print $4}')
             repos=$(curl -s https://api.github.com/users/$username/repos | jq -r '.[].clone_url')
             echo "$repos" > ${username}_repos.txt
-          done < company_list.txt
+          done < github_profiles.txt
 
       - name: Clone Repositories and Scan
         run: |
@@ -54,7 +54,7 @@ jobs:
             else
               curl -H "Content-Type: application/json" -X POST -d "{\"content\": \"> **Scan Completed with Issues**\n> ```github.com/$username Scan Failed and Action Failed```\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
             fi
-          done < company_list.txt
+          done < github_profiles.txt
 
       - name: Cleanup
         run: |
