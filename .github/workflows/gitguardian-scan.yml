@@ -43,13 +43,28 @@ jobs:
             repos=$(curl -s https://api.github.com/users/$USERNAME/repos | jq -r '.[].clone_url')
             echo "$repos" > repos.txt
 
+            # Send repository list to Discord
+            curl -H "Content-Type: application/json" \
+              -d "{\"content\": \"> **Repository List for ${USERNAME}:** \n\`\`\`\n$(cat repos.txt)\n\`\`\`\"}" \
+              ${{ secrets.DISCORD_WEBHOOK_URL }}
+
             mkdir repos
             cd repos
             while read repo; do
               git clone $repo
             done < ../repos.txt
 
-            ggshield secret scan repo . > scan_results.txt
+            # Double check that GitGuardian API is scanning cloned repositories
+            if [ -d "./" ]; then
+              echo "> **Starting Scan with GitGuardian API on cloned repositories**"
+              ggshield secret scan repo . > ../scan_results_${USERNAME}.txt
+            else
+              echo "> **Error:** No repositories cloned for ${USERNAME}"
+              curl -H "Content-Type: application/json" \
+                -d "{\"content\": \"> **Error:** No repositories cloned for _${USERNAME}_\"}" \
+                ${{ secrets.DISCORD_WEBHOOK_URL }}
+              exit 1
+            fi
 
             if [ $? -eq 0 ]; then
               SCAN_STATUS="Success"
@@ -57,9 +72,14 @@ jobs:
               SCAN_STATUS="Failure"
             fi
 
+            # Send scan status and report to Discord
             curl -H "Content-Type: application/json" \
-              -d "{\"content\": \"> **Scan Status:** github.com/${USERNAME} \`${SCAN_STATUS}\`\"}" \
+              -d "{\"content\": \"> **Scan Status for ${USERNAME}:** \`${SCAN_STATUS}\`\n**Scan Report:**\n\`\`\`\n$(cat ../scan_results_${USERNAME}.txt | tail -n 50)\n\`\`\`\"}" \
               ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+            # Print scan report to action log
+            echo "Scan Report for ${USERNAME}:"
+            cat ../scan_results_${USERNAME}.txt
 
             cd ..
             rm -rf repos repos.txt
