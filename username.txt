@@ -1,0 +1,9 @@
+shopify
+tiktok
+twitter
+vimeo
+weblate
+wordpress
+zomato
+uber
+swiggy
