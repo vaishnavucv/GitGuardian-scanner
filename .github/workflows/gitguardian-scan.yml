@@ -71,3 +71,6 @@ jobs:
           curl -H "Content-Type: application/json" \
             -d "{\"content\": \"> **Workflow Completed:** All profiles scanned.\"}" \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+    env:
+      GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
