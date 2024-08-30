@@ -1,73 +1,73 @@
-name: GitHub Profile Scanner
+name: GitGuardian Profile Scan
 
-on:
+on: 
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  scan:
+  scanning:
+    name: Scan GitHub Profiles for Secrets
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Send Start Status to Discord
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d "{\"content\": \"> **Workflow Started:** Scanning profiles for secrets.\"}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
 
-    - name: Send start message to Discord
-      run: |
-        curl -H "Content-Type: application/json" \
-             -X POST \
-             -d "{\"content\": \"**Scan Started**: The GitHub profile scan process has started.\"}" \
-             https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # fetch all history so multiple commits can be scanned
 
-    - name: Install GitGuardian CLI
-      run: |
-        pip install ggshield
+      - name: Install Required Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+          pip install ggshield
 
-    - name: Scan GitHub Profiles
-      run: |
-        while read username; do
-          repos=$(curl -s https://api.github.com/users/$username/repos | jq -r '.[].clone_url')
-          if [ -n "$repos" ]; then
-            echo "$repos" > ${username}_repos.txt
-          else
-            echo "No repositories found for $username" >> error.log
+      - name: Fetch and Scan User Repositories
+        run: |
+          while IFS= read -r USERNAME; do
+            echo "> **Scanning Profile:** $USERNAME"
             curl -H "Content-Type: application/json" \
-                 -X POST \
-                 -d "{\"content\": \"> **Error**: No repositories found for ```github.com/$username```\"}" \
-                 https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
-          fi
-          sleep 1  # Add delay to prevent rate limiting
-        done < github_username.txt
+              -d "{\"content\": \"> **Scanning Profile:** _${USERNAME}_\"}" \
+              ${{ secrets.DISCORD_WEBHOOK_URL }}
+              
+            repos=$(curl -s https://api.github.com/users/$USERNAME/repos | jq -r '.[].clone_url')
+            echo "$repos" > repos.txt
 
-    - name: Clone and Scan Repositories
-      run: |
-        while read username; do
-          mkdir -p repos/$username
-          cd repos/$username
-          if [ -f ../../${username}_repos.txt ]; then
+            mkdir repos
+            cd repos
             while read repo; do
-              git clone $repo || { echo "Failed to clone $repo" >> ../../error.log; continue; }
-            done < ../../${username}_repos.txt
-            ggshield secret scan repo .
-            scan_status=$?
-            cd ../../
-            if [ $scan_status -eq 0 ]; then
-              curl -H "Content-Type: application/json" \
-                   -X POST \
-                   -d "{\"content\": \"> **Scan Completed Successfully**\n> ```github.com/$username Scan Passed and Action Succeeded```\"}" \
-                   https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
+              git clone $repo
+            done < ../repos.txt
+
+            ggshield secret scan --all -r . > scan_results.txt
+
+            if [ $? -eq 0 ]; then
+              SCAN_STATUS="Success"
             else
-              curl -H "Content-Type: application/json" \
-                   -X POST \
-                   -d "{\"content\": \"> **Scan Completed with Issues**\n> ```github.com/$username Scan Failed and Action Failed```\"}" \
-                   https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
+              SCAN_STATUS="Failure"
             fi
-          else
+
             curl -H "Content-Type: application/json" \
-                 -X POST \
-                 -d "{\"content\": \"> **Error**: No repositories to scan for ```github.com/$username```\"}" \
-                 https://discord.com/api/webhooks/1277716500030947398/JinsvG3G3Rjvr-XkZEBFF8P6L4suKqh7NWj8b5Q2aW-hDgc7_dhKN7YvLeeZcW4ysJA1
-          fi
-          sleep 1  # Add delay to prevent rate limiting
-        done < github_username.txt
+              -d "{\"content\": \"> **Scan Status:** github.com/${USERNAME} \`${SCAN_STATUS}\`\"}" \
+              ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+            cd ..
+            rm -rf repos repos.txt
+
+          done < username.txt
+
+      - name: Send Completion Status to Discord
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d "{\"content\": \"> **Workflow Completed:** All profiles scanned.\"}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
