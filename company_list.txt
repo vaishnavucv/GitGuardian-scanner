@@ -1,0 +1,51 @@
+Mail.ru 
+HackerOne 
+Shopify 
+Nextcloud 
+Twitter 
+X (formerly Twitter) 
+Uber 
+Node.js 
+shopify-scripts 
+Legal Robot 
+U.S. Dept of Defense 
+Gratipay 
+Weblate 
+VK.com 
+New Relic 
+LocalTapiola 
+Zomato 
+Slack 
+ownCloud 
+GitLab 
+Ubiquiti Inc. 
+Automattic 
+Coinbase 
+Verizon Media 
+Starbucks 
+Paragon Initiative Enterprises 
+PHP (IBB) 
+Brave Software 
+Vimeo 
+OLX 
+concrete5 
+Phabricator 
+Pornhub 
+Localize 
+Qiwi 
+WordPress 
+The Internet 
+Open-Xchange 
+Razer 
+Rockstar Games 
+GitHub Security Lab 
+h1-ctf 
+Valve 
+Yahoo! 
+Internet Bug Bounty 
+Concrete CMS 
+Sifchain 
+Curl 
+Acronis 
+TikTok 
+MTN Group 
